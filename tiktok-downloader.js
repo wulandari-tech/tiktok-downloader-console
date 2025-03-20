@@ -1,16 +1,4 @@
-/**
- * TikTok Video Downloader and Information Extractor
- *
- * This script utilizes various modules to download TikTok videos and extract valuable information
- * from them. It relies on Axios for making HTTP requests, Cheerio for parsing HTML content,
- * and Tough-Cookie for handling cookies. The primary purpose of the script is to process a list
- * of TikTok video URLs, retrieve their video data, download the video files, and extract relevant
- * information from the video pages.
- *
- * Important: Please replace the placeholder values like "replace with..." with actual and valid values.
- */
 
-// Importing required modules
 const fs = require("fs");
 const axios = require("axios").default;
 const {
