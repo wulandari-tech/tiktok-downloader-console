@@ -1,4 +1,3 @@
-
 const fs = require("fs");
 const axios = require("axios").default;
 const {
@@ -9,6 +8,7 @@ const {
     formatDate
 } = require("tough-cookie");
 const cheerio = require("cheerio");
+const http = require('http'); // Import modul http
 
 // User-agent string used for making HTTP requests
 const USER_AGENT =
@@ -466,156 +466,205 @@ const parseVideoData = async (raw) => {
         throw new Error("Failed to parse JSON data");
     }
 };
-/**
- * Asynchronous function to download images or videos from TikTok.
- * Iterates through a list of TikTok video URLs, fetches video details
- * from the TikTok API, and downloads either images or videos based on
- * the content type of the TikTok post.
- */
-(async () => {
-    // Array of TikTok video URLs
-    const urls = [
-        "https://www.tiktok.com/@user1/video/1234567890123456789",
-        "https://www.tiktok.com/@user2/video/2345678901234567890",
-        "https://www.tiktok.com/@user3/photo/3456789012345678901",
-        "https://www.tiktok.com/@user4/photo/4567890123456789012",
-    ];
-    // Additional query parameters for TikTok URL
-    const queryParams =
-        "?is_from_webapp=1&sender_device=pc&web_id=7221493350775866882";
 
-    // Loop through each TikTok URL
-    for (const url of urls) {
-        let modifiedUrl = url;
-        // Append query parameters to the URL
-        if (url.includes("?")) {
-            modifiedUrl += "&" + queryParams;
-        } else {
-            modifiedUrl += "?" + queryParams;
-        }
 
-        try {
-            // Check if the URL is for a photo or video
-            if (url.includes("/photo/")) {
-                // If the URL is for a photo, download the image
-                const idVideo = await getIDPhoto(url);
-                const API_URL = `https://api16-normal-c-useast1a.tiktokv.com/aweme/v1/feed/?aweme_id=${idVideo}`;
-                const request = await instance(API_URL, {
-                    method: "GET",
-                    headers: headers,
-                });
-                const body = request.data;
 
-                // Check if the photo has images
-                if (
-                    body.aweme_list[0].image_post_info &&
-                    body.aweme_list[0].image_post_info.images &&
-                    body.aweme_list[0].image_post_info.images.length > 0
-                ) {
-                    const imageList = body.aweme_list[0].image_post_info.images;
+// Membuat server HTTP
+const server = http.createServer(async (req, res) => {
+    // Mengatur header CORS agar dapat diakses dari berbagai origin
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-                    // Loop through each image
-                    for (let i = 0; i < imageList.length; i++) {
-                        const authorUniqueId = body.aweme_list[0].author.unique_id;
-                        const imageUrl = imageList[i].display_image.url_list[0];
-                        const awemeId = body.aweme_list[0].aweme_id;
-                        const tanggalan = body.aweme_list[0].create_time;
-                        const imageIndex = i + 1;
-                        const imageId = `${awemeId}_${imageIndex}`;
-                        const formattedDate = formatUploadDate(tanggalan);
+     // Menangani preflight request (OPTIONS)
+     if (req.method === 'OPTIONS') {
+        res.writeHead(204);
+        res.end();
+        return;
+    }
 
-                        const newFileName = `${authorUniqueId}_image_${formattedDate}_${imageIndex}.jpg`;
 
-                        // Download the image
-                        await downloadImages(
-                            url,
-                            imageId,
-                            [imageUrl],
-                            tanggalan,
-                            authorUniqueId,
-                            newFileName
-                        );
-                        console.log(
-                            `✅ Image ${imageIndex} downloaded for ${authorUniqueId}`
-                        );
-                    }
-                } else {
-                    console.log("No images found for the provided photo URL.");
-                }
+    // Handle request dengan method GET dan URL '/'
+    if (req.method === 'GET' && req.url === '/') {
+        // Array of TikTok video URLs
+        const urls = [
+            "https://www.tiktok.com/@user1/video/1234567890123456789",
+            "https://www.tiktok.com/@user2/video/2345678901234567890",
+            "https://www.tiktok.com/@user3/photo/3456789012345678901",
+            "https://www.tiktok.com/@user4/photo/4567890123456789012",
+        ];
+        // Additional query parameters for TikTok URL
+        const queryParams =
+            "?is_from_webapp=1&sender_device=pc&web_id=7221493350775866882";
+
+        // Array untuk menyimpan hasil download
+        const downloadResults = [];
+
+        // Loop through each TikTok URL
+        for (const url of urls) {
+            let modifiedUrl = url;
+            // Append query parameters to the URL
+            if (url.includes("?")) {
+                modifiedUrl += "&" + queryParams;
             } else {
-                // If the URL is for a video, download the video
-                await new Promise((resolve) => setTimeout(resolve, 2000));
-                const resp = await download(modifiedUrl);
-                const {
-                    data
-                } = resp;
+                modifiedUrl += "?" + queryParams;
+            }
 
-                // Video download logic
-                const $ = getDocument(await handleHtml(url));
-                const jsonDataElement = $("#__UNIVERSAL_DATA_FOR_REHYDRATION__");
-                await new Promise((resolve) => setTimeout(resolve, 3000));
+            try {
+                // Check if the URL is for a photo or video
+                if (url.includes("/photo/")) {
+                    // If the URL is for a photo, download the image
+                    const idVideo = await getIDPhoto(url);
+                    const API_URL = `https://api16-normal-c-useast1a.tiktokv.com/aweme/v1/feed/?aweme_id=${idVideo}`;
+                    const request = await instance(API_URL, {
+                        method: "GET",
+                        headers: headers,
+                    });
+                    const body = request.data;
 
-                // Check if JSON data is present in the HTML document
-                if (jsonDataElement && jsonDataElement.length > 0) {
-                    const rawJSON = jsonDataElement[0]?.children?.[0]?.data;
+                    // Check if the photo has images
+                    if (
+                        body.aweme_list[0].image_post_info &&
+                        body.aweme_list[0].image_post_info.images &&
+                        body.aweme_list[0].image_post_info.images.length > 0
+                    ) {
+                        const imageList = body.aweme_list[0].image_post_info.images;
 
-                    // Check if raw JSON data is present
-                    if (rawJSON) {
-                        try {
-                            // Parse JSON data
-                            const parsedJSON = JSON.parse(rawJSON);
-                            const videoDetail =
-                                parsedJSON?.__DEFAULT_SCOPE__?.["webapp.video-detail"];
+                        // Loop through each image
+                        for (let i = 0; i < imageList.length; i++) {
+                            const authorUniqueId = body.aweme_list[0].author.unique_id;
+                            const imageUrl = imageList[i].display_image.url_list[0];
+                            const awemeId = body.aweme_list[0].aweme_id;
+                            const tanggalan = body.aweme_list[0].create_time;
+                            const imageIndex = i + 1;
+                            const imageId = `${awemeId}_${imageIndex}`;
+                            const formattedDate = formatUploadDate(tanggalan);
 
-                            // Check if videoDetail is present in parsed JSON
-                            if (videoDetail) {
-                                const itemInfo = videoDetail?.itemInfo;
-                                const itemStruct = itemInfo?.itemStruct;
-                                const author = itemStruct?.author;
+                            const newFileName = `${authorUniqueId}_image_${formattedDate}_${imageIndex}.jpg`;
 
-                                // Check if author information is present
-                                if (author) {
-                                    const authorName = author?.uniqueId ?? "UnknownAuthor";
-                                    const formattedDate = formatUploadDate(itemStruct.createTime);
-                                    const newFileName = `${authorName}_video_${formattedDate}_${itemStruct.id}.mp4`;
+                            // Download the image
+                            await downloadImages(
+                                url,
+                                imageId,
+                                [imageUrl],
+                                tanggalan,
+                                authorUniqueId,
+                                newFileName
+                            );
+                            console.log(
+                                `✅ Image ${imageIndex} downloaded for ${authorUniqueId}`
+                            );
 
-                                    // Check if video data is defined and write to file
-                                    if (data !== undefined) {
-                                        const targetFolder = "./tiktok-videos";
-
-                                        // Check if the target folder exists, create it if not
-                                        if (!fs.existsSync(targetFolder)) {
-                                            fs.mkdirSync(targetFolder, {
-                                                recursive: true
-                                            });
-                                        }
-
-                                        // Save the video to the filesystem in the "tiktok-videos" folder
-                                        fs.writeFileSync(`${targetFolder}/${newFileName}`, data);
-                                        console.log(
-                                            `✅ Video downloaded for ${authorName}_${itemStruct.id}`
-                                        );
-                                    } else {
-                                        console.error("Error: Video data is undefined.");
-                                    }
-                                } else {
-                                    console.error("Error: 'author' is undefined.");
-                                }
-                            } else {
-                                console.error("Error: 'videoDetail' is undefined.");
-                            }
-                        } catch (error) {
-                            console.error("Failed to parse JSON:", error.message);
+                            // Tambahkan hasil download ke array
+                            downloadResults.push({
+                                type: 'image',
+                                url: imageUrl,
+                                filename: newFileName
+                            });
                         }
                     } else {
-                        console.error("Failed to extract JSON data from HTML");
+                        console.log("No images found for the provided photo URL.");
                     }
                 } else {
-                    // console.error("Unable to find JSON data in HTML document");
+                    // If the URL is for a video, download the video
+                    await new Promise((resolve) => setTimeout(resolve, 2000));
+                    const resp = await download(modifiedUrl);
+                    const {
+                        data
+                    } = resp;
+
+                    // Video download logic
+                    const $ = getDocument(await handleHtml(url));
+                    const jsonDataElement = $("#__UNIVERSAL_DATA_FOR_REHYDRATION__");
+                    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+                    // Check if JSON data is present in the HTML document
+                    if (jsonDataElement && jsonDataElement.length > 0) {
+                        const rawJSON = jsonDataElement[0]?.children?.[0]?.data;
+
+                        // Check if raw JSON data is present
+                        if (rawJSON) {
+                            try {
+                                // Parse JSON data
+                                const parsedJSON = JSON.parse(rawJSON);
+                                const videoDetail =
+                                    parsedJSON?.__DEFAULT_SCOPE__?.["webapp.video-detail"];
+
+                                // Check if videoDetail is present in parsed JSON
+                                if (videoDetail) {
+                                    const itemInfo = videoDetail?.itemInfo;
+                                    const itemStruct = itemInfo?.itemStruct;
+                                    const author = itemStruct?.author;
+
+                                    // Check if author information is present
+                                    if (author) {
+                                        const authorName = author?.uniqueId ?? "UnknownAuthor";
+                                        const formattedDate = formatUploadDate(itemStruct.createTime);
+                                        const newFileName = `${authorName}_video_${formattedDate}_${itemStruct.id}.mp4`;
+
+                                        // Check if video data is defined and write to file
+                                        if (data !== undefined) {
+                                            const targetFolder = "./tiktok-videos";
+
+                                            // Check if the target folder exists, create it if not
+                                            if (!fs.existsSync(targetFolder)) {
+                                                fs.mkdirSync(targetFolder, {
+                                                    recursive: true
+                                                });
+                                            }
+
+                                            // Save the video to the filesystem in the "tiktok-videos" folder
+                                            fs.writeFileSync(`${targetFolder}/${newFileName}`, data);
+                                            console.log(
+                                                `✅ Video downloaded for ${authorName}_${itemStruct.id}`
+                                            );
+
+                                            // Tambahkan hasil download ke array
+                                            downloadResults.push({
+                                                type: 'video',
+                                                url: modifiedUrl,
+                                                filename: newFileName
+                                            });
+                                        } else {
+                                            console.error("Error: Video data is undefined.");
+                                        }
+                                    } else {
+                                        console.error("Error: 'author' is undefined.");
+                                    }
+                                } else {
+                                    console.error("Error: 'videoDetail' is undefined.");
+                                }
+                            } catch (error) {
+                                console.error("Failed to parse JSON:", error.message);
+                            }
+                        } else {
+                            console.error("Failed to extract JSON data from HTML");
+                        }
+                    } else {
+                        // console.error("Unable to find JSON data in HTML document");
+                    }
                 }
+            } catch (error) {
+                console.error("Error while processing", url, error);
             }
-        } catch (error) {
-            console.error("Error while processing", url, error);
         }
+
+        // Mengirimkan response dengan hasil download
+        res.writeHead(200, {
+            'Content-Type': 'application/json'
+        });
+        res.end(JSON.stringify(downloadResults));
+    } else {
+        // Mengirimkan response 'Not Found' jika URL tidak cocok
+        res.writeHead(404, {
+            'Content-Type': 'text/plain'
+        });
+        res.end('Not Found');
     }
-})();
+});
+
+// Menjalankan server pada localhost dan port 8080
+const PORT = 8080;
+server.listen(PORT, 'localhost', () => {
+    console.log(`Server running at http://localhost:${PORT}/`);
+});
